@@ -4,6 +4,7 @@ import (
 	"database/sql"
 	"fmt"
 	"net/http"
+	"strconv"
 
 	"github.com/gin-gonic/gin"
 	_ "github.com/mattn/go-sqlite3"
@@ -32,7 +33,11 @@ func main() {
 
 	router := gin.Default()
 	router.POST("/tasks", createTask)
+	router.GET("/tasks/:id", getTask)
+	router.PUT("/tasks/:id", updateTask)
+	router.DELETE("/tasks/:id", deleteTask)
 	router.GET("/tasks", listTasks)
+
 	router.Run(":8080")
 }
 
@@ -65,6 +70,56 @@ func createTask(c *gin.Context) {
 
 	newTask.ID = int(id)
 	c.JSON(http.StatusCreated, newTask)
+}
+
+func getTask(c *gin.Context) {
+	id := c.Param("id")
+	var task Task
+
+	row := db.QueryRow("SELECT * FROM tasks WHERE ID = ?", id)
+	err := row.Scan(&task.ID, &task.Title, &task.Description, &task.DueDate, &task.Status)
+	if err != nil {
+		if err == sql.ErrNoRows {
+			c.JSON(http.StatusNotFound, gin.H{"error": "Task not found"})
+			return
+		}
+
+		c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
+		return
+	}
+
+	c.JSON(http.StatusOK, task)
+}
+
+func updateTask(c *gin.Context) {
+	id := c.Param("id")
+	var task Task
+
+	if err := c.BindJSON(&task); err != nil {
+		c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
+		return
+	}
+
+	_, err := db.Exec("UPDATE tasks SET Title = ?, Description = ?, DueDate = ? WHERE ID = ?", task.Title, task.Description, task.DueDate, id)
+	if err != nil {
+		c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
+		return
+	}
+
+	task.ID, _ = strconv.Atoi(id)
+	c.JSON(http.StatusOK, task)
+}
+
+func deleteTask(c *gin.Context) {
+	id := c.Param("id")
+
+	_, err := db.Exec("DELETE FROM tasks WHERE ID = ?", id)
+	if err != nil {
+		c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
+		return
+	}
+
+	c.JSON(http.StatusOK, gin.H{"message": "Task deleted"})
 }
 
 func listTasks(c *gin.Context) {
