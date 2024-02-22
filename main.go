@@ -32,7 +32,7 @@ func main() {
 
 	router := gin.Default()
 	router.POST("/tasks", createTask)
-
+	router.GET("/tasks", listTasks)
 	router.Run(":8080")
 }
 
@@ -65,4 +65,26 @@ func createTask(c *gin.Context) {
 
 	newTask.ID = int(id)
 	c.JSON(http.StatusCreated, newTask)
+}
+
+func listTasks(c *gin.Context) {
+	var tasks []Task
+
+	rows, err := db.Query("SELECT * FROM tasks")
+	if err != nil {
+		c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
+		return
+	}
+	defer rows.Close()
+
+	for rows.Next() {
+		var task Task
+		if err := rows.Scan(&task.ID, &task.Title, &task.Description, &task.DueDate, &task.Status); err != nil {
+			c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
+			return
+		}
+		tasks = append(tasks, task)
+	}
+
+	c.JSON(http.StatusOK, tasks)
 }
