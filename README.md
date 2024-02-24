@@ -55,4 +55,3 @@ Guidelines for contributing to the project.
 Specify the license under which the project is released.
 ```
 
-This template gives an overview of the sections and contents to include in your README.md, ensuring it's informative and useful for users and contributors. You should customize each section according to your project's specifics.
