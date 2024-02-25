@@ -45,39 +45,48 @@ List tasks:
 curl -X GET http://localhost:8080/tasks
 ```
 
-Here are example curl commands for testing each functionality of your Task Management API:
+Here's how to format the instructions into a README.md format for your Task Management API:
 
-Create a New Task
-bash
-Copy code
+```markdown
+# Task Management API Usage Examples
+
+## Create a New Task
+To create a new task, use the following `curl` command:
+```bash
 curl -X POST http://localhost:8080/tasks \
      -H "Content-Type: application/json" \
      -d '{"title": "New Task", "description": "Task description", "dueDate": "2024-03-01"}'
-Retrieve a Task by ID
-Replace {id} with the actual ID of the task.
+```
 
-bash
-Copy code
+## Retrieve a Task by ID
+To retrieve a task by its ID, replace `{id}` with the actual ID of the task:
+```bash
 curl -X GET http://localhost:8080/tasks/{id}
-Update a Task
-Replace {id} with the ID of the task you want to update.
+```
 
-bash
-Copy code
+## Update a Task
+To update an existing task, replace `{id}` with the ID of the task you want to update:
+```bash
 curl -X PUT http://localhost:8080/tasks/{id} \
      -H "Content-Type: application/json" \
      -d '{"title": "Updated Title", "description": "Updated description", "dueDate": "2024-03-10"}'
-Delete a Task
-Replace {id} with the ID of the task you want to delete.
+```
 
-bash
-Copy code
+## Delete a Task
+To delete a task, replace `{id}` with the ID of the task you want to delete:
+```bash
 curl -X DELETE http://localhost:8080/tasks/{id}
-List All Tasks
-bash
-Copy code
-curl -X GET http://localhost:8080/tasks
-Ensure you replace {id} with the actual ID of the task you're targeting in the retrieve, update, and delete commands.
+```
 
+## List All Tasks
+To list all tasks:
+```bash
+curl -X GET http://localhost:8080/tasks
+```
+
+Remember to replace `{id}` with the actual ID of the task for the retrieve, update, and delete commands.
+```
+
+This format provides clear instructions for interacting with your API, organized by task action for easy reference.
 ```
 
