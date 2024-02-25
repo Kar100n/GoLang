@@ -45,13 +45,39 @@ List tasks:
 curl -X GET http://localhost:8080/tasks
 ```
 
-## Testing
-Explain how to run tests (if applicable).
+Here are example curl commands for testing each functionality of your Task Management API:
 
-## Contribution
-Guidelines for contributing to the project.
+Create a New Task
+bash
+Copy code
+curl -X POST http://localhost:8080/tasks \
+     -H "Content-Type: application/json" \
+     -d '{"title": "New Task", "description": "Task description", "dueDate": "2024-03-01"}'
+Retrieve a Task by ID
+Replace {id} with the actual ID of the task.
 
-## License
-Specify the license under which the project is released.
+bash
+Copy code
+curl -X GET http://localhost:8080/tasks/{id}
+Update a Task
+Replace {id} with the ID of the task you want to update.
+
+bash
+Copy code
+curl -X PUT http://localhost:8080/tasks/{id} \
+     -H "Content-Type: application/json" \
+     -d '{"title": "Updated Title", "description": "Updated description", "dueDate": "2024-03-10"}'
+Delete a Task
+Replace {id} with the ID of the task you want to delete.
+
+bash
+Copy code
+curl -X DELETE http://localhost:8080/tasks/{id}
+List All Tasks
+bash
+Copy code
+curl -X GET http://localhost:8080/tasks
+Ensure you replace {id} with the actual ID of the task you're targeting in the retrieve, update, and delete commands.
+
 ```
 
