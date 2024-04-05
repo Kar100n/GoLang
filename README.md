@@ -14,7 +14,7 @@ This Task Management API is built using the Go programming language with the Gin
 ## Installation
 Clone the repository and navigate to the project directory:
 ```bash
-git clone https://yourrepository.git
+git clone [https://yourrepository.git](https://github.com/Kar100n/GoLang.git)
 cd yourproject
 ```
 Install dependencies:
