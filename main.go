@@ -16,7 +16,7 @@ type User struct {
 	Email   string `json:"email"`
 	Contact string `json:"contact"`
 	Role    string `json:"role"`
-	LibID   string `json:"libID"`
+	LibID   int    `json:"libID"`
 }
 
 type Library struct {
@@ -26,13 +26,35 @@ type Library struct {
 
 type BookInventory struct {
 	ISBN            string `json:"isbn"`
-	LibID           string `json:"libID"`
+	LibID           int    `json:"libID"`
 	Title           string `json:"title"`
 	Authors         string `json:"authors"`
 	Publisher       string `json:"publisher"`
 	Version         string `json:"version"`
 	TotalCopies     int    `json:"totalCopies"`
 	AvailableCopies int    `json:"availableCopies"`
+}
+
+type RequestEvent struct {
+	ReqID        int    `json:"req_id"`
+	BookID       int    `json:"book_id"`
+	ReaderID     int    `json:"reader_id"`
+	RequestDate  string `json:"request_date"`
+	ApprovalDate string `json:"approval_date"`
+	ApproverID   int    `json:"approver_id"`
+	RequestType  string `json:"request_type"`
+}
+
+type IssueRegistery struct {
+	IssueID            int    `json:"issueID"`
+	ISBN               string `json:"isbn"`
+	ReaderID           int    `json:"readerID"`
+	IssueApproverID    int    `json:"issueApproverID"`
+	IssueStatus        string `json:"issueStatus"`
+	IssueDate          string `json:"issueDate"`
+	ExpectedReturnDate string `json:"expectedReturnDate"`
+	ReturnDate         string `json:"returnDate"`
+	ReturnApproverID   int    `json:"returnApproverID"`
 }
 
 var db *sql.DB
@@ -46,26 +68,44 @@ func main() {
 	defer db.Close()
 
 	// Ensure the tables exist
-	createUsersTable()
 	createLibraryTable()
-	defer deleteLibraryTable()
+	createUsersTable()
 	createBookInventoryTable()
-	purgeAllTables()
-	createAllTables()
+	createRequestEventsTable()
+	createIssueRegisteryTable()
 
+	// user routes
 	router := gin.Default()
 	router.POST("/users", createUser)
 	router.GET("/users/:id", getUser)
 	router.PUT("/users/:id", updateUser)
 	router.DELETE("/users/:id", deleteUser)
 	router.GET("/users", listUsers)
-
+	// bookInv Routes
 	router.POST("/books", createBook)
 	router.GET("/books/:isbn", getBook)
 	router.PUT("/books/:isbn", updateBook)
 	router.DELETE("/books/:isbn", deleteBook)
 	router.GET("/books", listBooks)
+	// Library routes
+	router.POST("/library", createLibrary)
+	router.GET("/library/:id", getLibrary)
+	router.PUT("/library/:id", updateLibrary)
+	router.DELETE("/library/:id", deleteLibrary)
+	router.GET("/library", listLibraries)
+	// RequestEvenets Routes
+	router.POST("/requestevents", createRequestEvent)
+	router.GET("/requestevents/:id", getRequestEvent)
+	router.PUT("/requestevents/:id", updateRequestEvent)
+	router.DELETE("/requestevents/:id", deleteRequestEvent)
+	router.GET("/requestevents", listRequestEvents)
 
+	// IssueReg Routes
+	router.POST("/issues", createIssue)
+	router.GET("/issues/:issueID", getIssue)
+	router.PUT("/issues/:issueID", updateIssue)
+	router.DELETE("/issues/:issueID", deleteIssue)
+	router.GET("/issues", listIssues)
 	router.Run(":8081")
 }
 
@@ -76,7 +116,8 @@ func createUsersTable() {
         "Email" TEXT,
         "Contact" TEXT,
         "Role" TEXT,
-        "LibID" TEXT UNIQUE
+        "LibID" INTEGER NOT NULL,
+        FOREIGN KEY ("LibID") REFERENCES library("ID")
     );`
 
 	_, err := db.Exec(createUsersTableSQL)
@@ -85,20 +126,75 @@ func createUsersTable() {
 	}
 }
 
+func createRequestEventsTable() {
+	createRequestEventsTableSQL := `CREATE TABLE IF NOT EXISTS RequestEvents (
+        "ReqID" INTEGER PRIMARY KEY AUTOINCREMENT,
+        "BookID" INTEGER,
+        "ReaderID" INTEGER,
+        "RequestDate" DATETIME,
+        "ApprovalDate" DATETIME,
+        "ApproverID" INTEGER,
+        "RequestType" TEXT,
+        FOREIGN KEY ("BookID") REFERENCES book_inventory("ISBN"),
+        FOREIGN KEY ("ReaderID") REFERENCES users("ID"),
+        FOREIGN KEY ("ApproverID") REFERENCES users("ID")
+    );`
+
+	_, err := db.Exec(createRequestEventsTableSQL)
+	if err != nil {
+		fmt.Println(err)
+	}
+}
+
 func createBookInventoryTable() {
 	createBookInventoryTableSQL := `CREATE TABLE IF NOT EXISTS book_inventory (
         "ISBN" TEXT PRIMARY KEY,
-        "LibID" TEXT,
+        "LibID" INTEGER NOT NULL,
         "Title" TEXT,
         "Authors" TEXT,
         "Publisher" TEXT,
         "Version" TEXT,
         "TotalCopies" INTEGER,
         "AvailableCopies" INTEGER,
-        FOREIGN KEY ("LibID") REFERENCES users("LibID")
+        FOREIGN KEY ("LibID") REFERENCES library("ID")
     );`
 
 	_, err := db.Exec(createBookInventoryTableSQL)
+	if err != nil {
+		fmt.Println(err)
+	}
+}
+
+func createLibraryTable() {
+	createLibraryTableSQL := `CREATE TABLE IF NOT EXISTS library (
+        "ID" INTEGER PRIMARY KEY AUTOINCREMENT,
+        "Name" TEXT
+    );`
+
+	_, err := db.Exec(createLibraryTableSQL)
+	if err != nil {
+		fmt.Println(err)
+	}
+}
+
+func createIssueRegisteryTable() {
+	createIssueRegisteryTableSQL := `CREATE TABLE IF NOT EXISTS IssueRegistery (
+        "IssueID" INTEGER PRIMARY KEY AUTOINCREMENT,
+        "ISBN" TEXT,
+        "ReaderID" INTEGER,
+        "IssueApproverID" INTEGER,
+        "IssueStatus" TEXT,
+        "IssueDate" DATETIME,
+        "ExpectedReturnDate" DATETIME,
+        "ReturnDate" DATETIME,
+        "ReturnApproverID" INTEGER,
+        FOREIGN KEY ("ISBN") REFERENCES book_inventory("ISBN"),
+        FOREIGN KEY ("ReaderID") REFERENCES users("ID"),
+        FOREIGN KEY ("IssueApproverID") REFERENCES users("ID"),
+        FOREIGN KEY ("ReturnApproverID") REFERENCES users("ID")
+    );`
+
+	_, err := db.Exec(createIssueRegisteryTableSQL)
 	if err != nil {
 		fmt.Println(err)
 	}
@@ -112,14 +208,18 @@ func createUser(c *gin.Context) {
 		return
 	}
 
-	if newUser.Role != "Admin" && newUser.Role != "Reader" {
-		c.JSON(http.StatusBadRequest, gin.H{"error": "Role must be either 'Admin' or 'Reader' (Case Sensitive)"})
+	statement, _ := db.Prepare("INSERT INTO users (Name, Email, Contact, Role, LibID) VALUES (?,?,?,?,?)")
+	result, err := statement.Exec(newUser.Name, newUser.Email, newUser.Contact, newUser.Role, newUser.LibID)
+	if err != nil {
+		c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
 		return
 	}
 
-	statement, _ := db.Prepare("INSERT INTO users (Name, Email, Contact, Role, LibID) VALUES (?,?,?,?,?)")
-	result, _ := statement.Exec(newUser.Name, newUser.Email, newUser.Contact, newUser.Role, newUser.LibID)
-	id, _ := result.LastInsertId()
+	id, err := result.LastInsertId()
+	if err != nil {
+		c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
+		return
+	}
 
 	newUser.ID = int(id)
 	c.JSON(http.StatusCreated, newUser)
@@ -206,7 +306,10 @@ func createBook(c *gin.Context) {
 		return
 	}
 
-	statement, _ := db.Prepare("INSERT INTO book_inventory (ISBN, LibID, Title, Authors, Publisher, Version, TotalCopies, AvailableCopies) VALUES (?,?,?,?,?,?,?,?)")
+	statement, _ := db.Prepare(`
+	INSERT INTO book_inventory (ISBN, LibID, Title, Authors, Publisher, Version, TotalCopies, AvailableCopies)
+	VALUES (?,?,?,?,?,?,?,?)
+`)
 	_, _ = statement.Exec(newBook.ISBN, newBook.LibID, newBook.Title, newBook.Authors, newBook.Publisher, newBook.Version, newBook.TotalCopies, newBook.AvailableCopies)
 	c.JSON(http.StatusCreated, newBook)
 }
@@ -282,42 +385,284 @@ func listBooks(c *gin.Context) {
 	c.JSON(http.StatusOK, books)
 }
 
-func createLibraryTable() {
-	createLibraryTableSQL := `CREATE TABLE IF NOT EXISTS library (
-        "ID" INTEGER PRIMARY KEY AUTOINCREMENT,
-        "Name" TEXT
-    );`
+// Library
+func listLibraries(c *gin.Context) {
+	var libraries []Library
 
-	_, err := db.Exec(createLibraryTableSQL)
+	rows, err := db.Query("SELECT * FROM library")
 	if err != nil {
-		fmt.Println(err)
+		c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
+		return
 	}
-}
+	defer rows.Close()
 
-func deleteLibraryTable() {
-	deleteLibraryTableSQL := `DROP TABLE IF EXISTS library;`
-
-	_, err := db.Exec(deleteLibraryTableSQL)
-	if err != nil {
-		fmt.Println(err)
-	}
-}
-
-func purgeAllTables() {
-	tables := []string{"users", "books", "library"}
-
-	for _, table := range tables {
-		deleteTableSQL := fmt.Sprintf("DROP TABLE IF EXISTS %s;", table)
-
-		_, err := db.Exec(deleteTableSQL)
-		if err != nil {
-			fmt.Println(err)
+	for rows.Next() {
+		var library Library
+		if err := rows.Scan(&library.ID, &library.Name); err != nil {
+			c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
+			return
 		}
+		libraries = append(libraries, library)
 	}
+
+	c.JSON(http.StatusOK, libraries)
 }
 
-func createAllTables() {
-	createUsersTable()
-	createBookInventoryTable()
-	createLibraryTable()
+func createLibrary(c *gin.Context) {
+	var newLibrary Library
+
+	if err := c.BindJSON(&newLibrary); err != nil {
+		c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
+		return
+	}
+
+	statement, _ := db.Prepare("INSERT INTO library (Name) VALUES (?)")
+	result, _ := statement.Exec(newLibrary.Name)
+	id, _ := result.LastInsertId()
+
+	newLibrary.ID = int(id)
+	c.JSON(http.StatusCreated, newLibrary)
+}
+
+func getLibrary(c *gin.Context) {
+	id := c.Param("id")
+	var library Library
+
+	row := db.QueryRow("SELECT * FROM library WHERE ID =?", id)
+	err := row.Scan(&library.ID, &library.Name)
+	if err != nil {
+		if err == sql.ErrNoRows {
+			c.JSON(http.StatusNotFound, gin.H{"error": "Library not found"})
+			return
+		}
+
+		c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
+		return
+	}
+
+	c.JSON(http.StatusOK, library)
+}
+
+func updateLibrary(c *gin.Context) {
+	id := c.Param("id")
+	var library Library
+
+	if err := c.BindJSON(&library); err != nil {
+		c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
+		return
+	}
+
+	_, err := db.Exec("UPDATE library SET Name =? WHERE ID =?", library.Name, id)
+	if err != nil {
+		c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
+		return
+	}
+
+	library.ID, _ = strconv.Atoi(id)
+	c.JSON(http.StatusOK, library)
+}
+
+func deleteLibrary(c *gin.Context) {
+	id := c.Param("id")
+
+	_, err := db.Exec("DELETE FROM library WHERE ID =?", id)
+	if err != nil {
+		c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
+		return
+	}
+
+	c.JSON(http.StatusOK, gin.H{"message": "Library deleted"})
+}
+
+// Request Events
+
+func createRequestEvent(c *gin.Context) {
+	var newRequestEvent RequestEvent
+
+	if err := c.BindJSON(&newRequestEvent); err != nil {
+		c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
+		return
+	}
+
+	statement, _ := db.Prepare("INSERT INTO RequestEvents (BookID, ReaderID, RequestDate, ApprovalDate, ApproverID, RequestType) VALUES (?,?,?,?,?,?)")
+	result, _ := statement.Exec(newRequestEvent.BookID, newRequestEvent.ReaderID, newRequestEvent.RequestDate, newRequestEvent.ApprovalDate, newRequestEvent.ApproverID, newRequestEvent.RequestType)
+	id, _ := result.LastInsertId()
+
+	newRequestEvent.ReqID = int(id)
+	c.JSON(http.StatusCreated, newRequestEvent)
+}
+
+func getRequestEvent(c *gin.Context) {
+	id := c.Param("id")
+	var requestEvent RequestEvent
+
+	row := db.QueryRow("SELECT * FROM RequestEvents WHERE ReqID =?", id)
+	err := row.Scan(&requestEvent.ReqID, &requestEvent.BookID, &requestEvent.ReaderID, &requestEvent.RequestDate, &requestEvent.ApprovalDate, &requestEvent.ApproverID, &requestEvent.RequestType)
+	if err != nil {
+		if err == sql.ErrNoRows {
+			c.JSON(http.StatusNotFound, gin.H{"error": "RequestEvent not found"})
+			return
+		}
+
+		c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
+		return
+	}
+
+	c.JSON(http.StatusOK, requestEvent)
+}
+
+func updateRequestEvent(c *gin.Context) {
+	id := c.Param("id")
+	var requestEvent RequestEvent
+
+	if err := c.BindJSON(&requestEvent); err != nil {
+		c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
+		return
+	}
+
+	_, err := db.Exec("UPDATE RequestEvents SET BookID =?, ReaderID =?, RequestDate =?, ApprovalDate =?, ApproverID =?, RequestType =? WHERE ReqID =?", requestEvent.BookID, requestEvent.ReaderID, requestEvent.RequestDate, requestEvent.ApprovalDate, requestEvent.ApproverID, requestEvent.RequestType, id)
+	if err != nil {
+		c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
+		return
+	}
+
+	requestEvent.ReqID, _ = strconv.Atoi(id)
+	c.JSON(http.StatusOK, requestEvent)
+}
+
+func deleteRequestEvent(c *gin.Context) {
+	id := c.Param("id")
+
+	_, err := db.Exec("DELETE FROM RequestEvents WHERE ReqID =?", id)
+	if err != nil {
+		c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
+		return
+	}
+
+	c.JSON(http.StatusOK, gin.H{"message": "RequestEvent deleted"})
+}
+
+func listRequestEvents(c *gin.Context) {
+	var requestEvents []RequestEvent
+
+	rows, err := db.Query("SELECT * FROM RequestEvents")
+	if err != nil {
+		c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
+		return
+	}
+	defer rows.Close()
+
+	for rows.Next() {
+		var requestEvent RequestEvent
+		if err := rows.Scan(&requestEvent.ReqID, &requestEvent.BookID, &requestEvent.ReaderID, &requestEvent.RequestDate, &requestEvent.ApprovalDate, &requestEvent.ApproverID, &requestEvent.RequestType); err != nil {
+			c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
+			return
+		}
+		requestEvents = append(requestEvents, requestEvent)
+	}
+
+	c.JSON(http.StatusOK, requestEvents)
+}
+
+// Issue registry functions
+
+// Create a new issue registry entry
+func createIssue(c *gin.Context) {
+	var newIssue IssueRegistery
+
+	if err := c.BindJSON(&newIssue); err != nil {
+		c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
+		return
+	}
+
+	statement, _ := db.Prepare("INSERT INTO IssueRegistery (ISBN, ReaderID, IssueApproverID, IssueStatus, IssueDate, ExpectedReturnDate) VALUES (?,?,?,?,?,?)")
+	result, err := statement.Exec(newIssue.ISBN, newIssue.ReaderID, newIssue.IssueApproverID, newIssue.IssueStatus, newIssue.IssueDate, newIssue.ExpectedReturnDate)
+	if err != nil {
+		c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
+		return
+	}
+
+	id, err := result.LastInsertId()
+	if err != nil {
+		c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
+		return
+	}
+
+	newIssue.IssueID = int(id)
+	c.JSON(http.StatusCreated, newIssue)
+}
+
+// Get an issue registry entry by ID
+func getIssue(c *gin.Context) {
+	id := c.Param("issueID")
+	var issue IssueRegistery
+
+	row := db.QueryRow("SELECT * FROM IssueRegistery WHERE IssueID =?", id)
+	err := row.Scan(&issue.IssueID, &issue.ISBN, &issue.ReaderID, &issue.IssueApproverID, &issue.IssueStatus, &issue.IssueDate, &issue.ExpectedReturnDate, &issue.ReturnDate, &issue.ReturnApproverID)
+	if err != nil {
+		if err == sql.ErrNoRows {
+			c.JSON(http.StatusNotFound, gin.H{"error": "Issue not found"})
+			return
+		}
+
+		c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
+		return
+	}
+
+	c.JSON(http.StatusOK, issue)
+}
+
+// Update an issue registry entry
+func updateIssue(c *gin.Context) {
+	id := c.Param("issueID")
+	var updatedIssue IssueRegistery
+
+	if err := c.BindJSON(&updatedIssue); err != nil {
+		c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
+		return
+	}
+
+	_, err := db.Exec("UPDATE IssueRegistery SET ISBN =?, ReaderID =?, IssueApproverID =?, IssueStatus =?, IssueDate =?, ExpectedReturnDate =?, ReturnDate =?, ReturnApproverID =? WHERE IssueID =?", updatedIssue.ISBN, updatedIssue.ReaderID, updatedIssue.IssueApproverID, updatedIssue.IssueStatus, updatedIssue.IssueDate, updatedIssue.ExpectedReturnDate, updatedIssue.ReturnDate, updatedIssue.ReturnApproverID, id)
+	if err != nil {
+		c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
+		return
+	}
+
+	c.JSON(http.StatusOK, updatedIssue)
+}
+
+// Delete an issue registry entry
+func deleteIssue(c *gin.Context) {
+	id := c.Param("issueID")
+
+	_, err := db.Exec("DELETE FROM IssueRegistery WHERE IssueID =?", id)
+	if err != nil {
+		c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
+		return
+	}
+
+	c.JSON(http.StatusOK, gin.H{"message": "Issue deleted"})
+}
+
+// List all issue registry entries
+func listIssues(c *gin.Context) {
+	var issues []IssueRegistery
+
+	rows, err := db.Query("SELECT * FROM IssueRegistery")
+	if err != nil {
+		c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
+		return
+	}
+	defer rows.Close()
+
+	for rows.Next() {
+		var issue IssueRegistery
+		if err := rows.Scan(&issue.IssueID, &issue.ISBN, &issue.ReaderID, &issue.IssueApproverID, &issue.IssueStatus, &issue.IssueDate, &issue.ExpectedReturnDate, &issue.ReturnDate, &issue.ReturnApproverID); err != nil {
+			c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
+			return
+		}
+		issues = append(issues, issue)
+	}
+
+	c.JSON(http.StatusOK, issues)
 }

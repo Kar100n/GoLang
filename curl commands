@@ -1,0 +1,17 @@
+Create Library:
+curl -X POST \
+  http://localhost:8081/library \
+  -H 'Content-Type: application/json' \
+  -d '{"Name":"Library Name"}'
+
+Create User:
+curl -X POST \
+  http://localhost:8081/users \
+  -H 'Content-Type: application/json' \
+  -d '{"Name":"John Doe","Email":"johndoe@example.com","Contact":"1234567890","Role":"Admin","LibID":1}'
+
+Create Book:
+curl -X POST \
+  http://localhost:8081/books \
+  -H 'Content-Type: application/json' \
+  -d '{"ISBN":"1234567890","LibID":1,"Title":"Book Title","Authors":"Author Name","Publisher":"Publisher Name","Version":"1.0","TotalCopies":10,"AvailableCopies":5}'
